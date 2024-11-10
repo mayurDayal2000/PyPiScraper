@@ -1,21 +1,23 @@
 import logging
+import pickle
 import random
 import re
 import time
-import pickle
 
 from bs4 import BeautifulSoup
 from requests import Timeout, RequestException
 from requests.exceptions import HTTPError
 from requests_cache import CachedSession
 
+from app.database import insert_project
+from app.model import Project
 from utils.helpers import get_headers
 
 
 class PyPiScrapper:
-    def __init__(self, url, rate_limit=15, delay_range=(3, 6), log_file="scrapper.log", cache_expiry=3600, progress_file="progress.pkl"):
+    def __init__(self, url, rate_limit=15, delay_range=(3, 6), log_file="scrapper.log", cache_expiry=3600,
+                 progress_file="progress.pkl"):
         self.url = url
-        self.projects = []
         self.rate_limit = rate_limit
         self.delay_range = delay_range
         self.requests_made = 0
@@ -30,7 +32,7 @@ class PyPiScrapper:
         self.logger.info("Initialized PyPiScrapper")
 
         self.session = CachedSession("pypi_cache", expire_after=cache_expiry,  # expire after 1 hour
-            allowable_methods=["GET"], allowable_codes=[200])
+                                     allowable_methods=["GET"], allowable_codes=[200])
 
         self.logger.info("Initialized CachedSession with expiry of {} seconds".format(cache_expiry))
 
@@ -137,10 +139,12 @@ class PyPiScrapper:
                 github_link = link.get('href')
                 break
 
-        self.logger.info(f"Scraped project: {project_title}")
-        return {"project_title": project_title, "project_description": project_description,
-                "project_maintainer": project_maintainer, "project_maintainer_email": maintainer_email,
-                "github_repo": github_link}
+        project = Project(project_title=project_title, project_description=project_description,
+                          project_maintainer=project_maintainer, project_maintainer_email=maintainer_email,
+                          github_repo=github_link)
+
+        self.logger.info(f"Scraped project: {project.project_title}")
+        return project
 
     def scrape_all_projects(self):
         """Scrape all projects from multiple pages"""
@@ -160,24 +164,29 @@ class PyPiScrapper:
                 project_data = self.scrape_project_page(project)
 
                 if project_data:
-                    self.projects.append(project_data)
+                    res = insert_project(project_data)
+
+                    if res.error:
+                        self.logger.error(f"Failed to insert project {project_data.project_title}: {res.error}.")
+                    else:
+                        self.logger.info(f"Inserted project {project_data.project_title} into database.")
+
                     self.visited_projects.add(project)
 
-            self.last_page = page # update last scraped page
-            self.save_progress() # save progress after each page
+            self.last_page = page  # update last scraped page
+            self.save_progress()  # save progress after each page
 
             page += 1
 
             time.sleep(random.uniform(*self.delay_range))
 
-        self.logger.info(f"Scraping completed. Total projects scraped: {len(self.projects)}")
+        self.logger.info(f"Scraping completed. Total projects scraped: {len(self.visited_projects)}")
 
     def load_progress(self):
         """Load saved progress if available"""
         try:
             with open(self.progress_file, "rb") as f:
                 data = pickle.load(f)
-                self.projects = data.get("projects", [])
                 self.visited_projects = set(data.get("visited_projects", []))
                 self.last_page = data.get("last_page", 1)
                 self.logger.info(f"Loaded progress from {self.progress_file}. Last scraped page: {self.last_page}")
@@ -186,14 +195,9 @@ class PyPiScrapper:
             self.visited_projects = set()
             self.last_page = 1
 
-
     def save_progress(self):
         """Save current progress to a file"""
-        data = {
-            "projects": self.projects,
-            "visited_projects": list(self.visited_projects),
-            "last_page": self.last_page
-        }
+        data = {"visited_projects": list(self.visited_projects), "last_page": self.last_page}
 
         with open(self.progress_file, "wb") as f:
             pickle.dump(data, f)
