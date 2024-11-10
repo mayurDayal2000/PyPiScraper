@@ -59,6 +59,12 @@ class PyPiScrapper:
         if content:
             soup = BeautifulSoup(content, "html.parser")
             project_cards = soup.find_all("a", {"class": "package-snippet"})
+
+            # If no project cards are found, thus reached last page
+            if not project_cards:
+                print(f"No projects found on page {page}.")
+                return []
+            
             time.sleep(random.uniform(*self.delay_range))
             return [card['href'] for card in project_cards]
         return []
@@ -107,11 +113,12 @@ class PyPiScrapper:
     def scrape_all_projects(self):
         """Scrape all projects from multiple pages"""
         page = 1
-        while page == 1:
+        while True:  # Continuously loop until no more projects are found
             print(f"Scraping page {page}...")
             projects = self.scrape_search_page(page)
 
             if not projects:
+                print(f"No more projects found on page {page}. Ending scrape.")
                 break
 
             for project in projects:
@@ -122,4 +129,6 @@ class PyPiScrapper:
 
             page += 1
 
-        print("Scraping completed. ")
+            time.sleep(random.uniform(*self.delay_range))
+
+        print(f"Scraping completed. Total projects scraped: {len(self.projects)}")
