@@ -7,6 +7,8 @@ from bs4 import BeautifulSoup
 from requests import Timeout, RequestException
 from requests.exceptions import HTTPError
 
+from utils.helpers import get_headers
+
 
 class PyPiScrapper:
     def __init__(self, url, rate_limit=15, delay_range=(3, 6)):
@@ -31,9 +33,7 @@ class PyPiScrapper:
 
     def fetch_page(self, url, retries=3):
         """Fetch a page with error handling and retires"""
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
-
+        headers = get_headers()
         self.rate_limit_check()
 
         for attempt in range(retries):
