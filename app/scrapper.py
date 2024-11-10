@@ -3,16 +3,16 @@ import random
 import re
 import time
 
-import requests
 from bs4 import BeautifulSoup
 from requests import Timeout, RequestException
 from requests.exceptions import HTTPError
+from requests_cache import CachedSession
 
 from utils.helpers import get_headers
 
 
 class PyPiScrapper:
-    def __init__(self, url, rate_limit=15, delay_range=(3, 6), log_file="scrapper.log"):
+    def __init__(self, url, rate_limit=15, delay_range=(3, 6), log_file="scrapper.log", cache_expiry=3600):
         self.url = url
         self.projects = []
         self.rate_limit = rate_limit
@@ -24,6 +24,11 @@ class PyPiScrapper:
 
         self.logger = logging.getLogger(__name__)
         self.logger.info("Initialized PyPiScrapper")
+
+        self.session = CachedSession("pypi_cache", expire_after=cache_expiry,  # expire after 1 hour
+            allowable_methods=["GET"], allowable_codes=[200])
+
+        self.logger.info("Initialized CachedSession with expiry of {} seconds".format(cache_expiry))
 
     def rate_limit_check(self):
         """Rate limit control to ensure we don't exceed the set rate limit"""
@@ -44,10 +49,15 @@ class PyPiScrapper:
 
         for attempt in range(retries):
             try:
-                response = requests.get(url, headers=headers, timeout=10)
+                response = self.session.get(url, headers=headers, timeout=10)
                 response.raise_for_status()
                 self.requests_made += 1
-                self.logger.debug(f"Successfully fetched {url}")
+
+                if response.from_cache:
+                    self.logger.info(f"Cache hit: {url}")
+                else:
+                    self.logger.debug(f"Fetched from server: {url}")
+
                 return response.content
             except HTTPError as http_err:
                 self.logger.error(f"HTTP error occurred: {http_err} -> URL: {url}")
