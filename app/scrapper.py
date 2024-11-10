@@ -9,19 +9,38 @@ from requests.exceptions import HTTPError
 
 
 class PyPiScrapper:
-    def __init__(self, url):
+    def __init__(self, url, rate_limit=15, delay_range=(3, 6)):
         self.url = url
         self.projects = []
+        self.rate_limit = rate_limit
+        self.delay_range = delay_range
+        self.requests_made = 0
+        self.start_time = time.time()
+
+    def rate_limit_check(self):
+        """Rate limit control to ensure we don't exceed the set rate limit"""
+        if self.requests_made >= self.rate_limit:
+            elapsed_time = time.time() - self.start_time
+            if elapsed_time < 60:
+                sleep_time = 60 - elapsed_time
+                print(f"Rate limit reached. Sleeping for {sleep_time:.2f} seconds.")
+                time.sleep(sleep_time)
+
+            self.requests_made = 0
+            self.start_time = time.time()
 
     def fetch_page(self, url, retries=3):
         """Fetch a page with error handling and retires"""
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
 
+        self.rate_limit_check()
+
         for attempt in range(retries):
             try:
                 response = requests.get(url, headers=headers, timeout=10)
                 response.raise_for_status()
+                self.requests_made += 1
                 return response.content
             except HTTPError as http_err:
                 print(f"HTTP error occurred: {http_err} -> URL: {url}")
@@ -29,7 +48,7 @@ class PyPiScrapper:
                 print(f"Timeout error: Retrying ({attempt + 1}/{retries}) -> URL: {url}")
             except RequestException as req_err:
                 print(f"Request error: {req_err} -> URL: {url}")
-            time.sleep(random.uniform(1, 3))  # delay between retries
+            time.sleep(random.uniform(*self.delay_range))  # delay between retries
         return None
 
     def scrape_search_page(self, page=1):
@@ -40,6 +59,7 @@ class PyPiScrapper:
         if content:
             soup = BeautifulSoup(content, "html.parser")
             project_cards = soup.find_all("a", {"class": "package-snippet"})
+            time.sleep(random.uniform(*self.delay_range))
             return [card['href'] for card in project_cards]
         return []
 
