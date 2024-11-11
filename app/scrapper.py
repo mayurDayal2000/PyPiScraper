@@ -5,6 +5,7 @@ import re
 import time
 
 from bs4 import BeautifulSoup
+from ratelimit import limits, sleep_and_retry
 from requests import Timeout, RequestException
 from requests.exceptions import HTTPError
 from requests_cache import CachedSession
@@ -15,13 +16,13 @@ from utils.helpers import get_headers
 
 
 class PyPiScrapper:
-    def __init__(self, url, rate_limit=15, delay_range=(3, 6), log_file="scrapper.log", cache_expiry=3600,
+    RATE_LIMIT_CALLS = 15
+    RATE_LIMIT_PERIOD = 60
+
+    def __init__(self, url, delay_range=(3, 6), log_file="scrapper.log", cache_expiry=3600,
                  progress_file="progress.pkl"):
         self.url = url
-        self.rate_limit = rate_limit
         self.delay_range = delay_range
-        self.requests_made = 0
-        self.start_time = time.time()
         self.progress_file = progress_file
         self.visited_projects = set()
         self.last_page = 1
@@ -38,28 +39,16 @@ class PyPiScrapper:
 
         self.load_progress()
 
-    def rate_limit_check(self):
-        """Rate limit control to ensure we don't exceed the set rate limit"""
-        if self.requests_made >= self.rate_limit:
-            elapsed_time = time.time() - self.start_time
-            if elapsed_time < 60:
-                sleep_time = 60 - elapsed_time
-                self.logger.info(f"Rate limit reached. Sleeping for {sleep_time:.2f} seconds.")
-                time.sleep(sleep_time)
-
-            self.requests_made = 0
-            self.start_time = time.time()
-
+    @sleep_and_retry
+    @limits(calls=RATE_LIMIT_CALLS, period=RATE_LIMIT_PERIOD)
     def fetch_page(self, url, retries=3, backoff_factor=1):
         """Fetch a page with error handling and retires"""
         headers = get_headers()
-        self.rate_limit_check()
 
         for attempt in range(retries):
             try:
                 response = self.session.get(url, headers=headers, timeout=10)
                 response.raise_for_status()
-                self.requests_made += 1
 
                 if response.from_cache:
                     self.logger.info(f"Cache hit: {url}")
