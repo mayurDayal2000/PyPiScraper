@@ -10,7 +10,7 @@ from requests import Timeout, RequestException
 from requests.exceptions import HTTPError
 from requests_cache import CachedSession
 
-from app.database import insert_project
+from app.database import SupabaseDatabase
 from app.model import Project
 from utils.helpers import get_headers
 
@@ -27,16 +27,21 @@ class PyPiScrapper:
         self.visited_projects = set()
         self.last_page = 1
 
+        # logging setup
         logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
         self.logger = logging.getLogger(__name__)
         self.logger.info("Initialized PyPiScrapper")
 
+        # session setup
         self.session = CachedSession("pypi_cache", expire_after=cache_expiry,  # expire after 1 hour
                                      allowable_methods=["GET"], allowable_codes=[200])
-
         self.logger.info("Initialized CachedSession with expiry of {} seconds".format(cache_expiry))
 
+        # initialize the database client
+        self.db = SupabaseDatabase()
+
+        # load progress
         self.load_progress()
 
     @sleep_and_retry
@@ -153,7 +158,7 @@ class PyPiScrapper:
                 project_data = self.scrape_project_page(project)
 
                 if project_data:
-                    res = insert_project(project_data)
+                    res = self.db.insert_project(project_data)
 
                     if res.error:
                         self.logger.error(f"Failed to insert project {project_data.project_title}: {res.error}.")
