@@ -1,6 +1,7 @@
 aiohttp==4.0.0a1
 beautifulsoup4==4.13.0b2
 fastapi==0.115.4
+fake-useragent==1.5.1
 httpx==1.0.0b0
 pip==24.3.1
 pydantic==2.10.0b1

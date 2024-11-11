@@ -6,8 +6,6 @@ def main():
 
     scrapper = PyPiScrapper(url)
     scrapper.scrape_all_projects()
-    for project in scrapper.projects:
-        print(project)
 
 
 if __name__ == '__main__':
