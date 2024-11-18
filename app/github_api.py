@@ -3,8 +3,8 @@ import logging
 import os
 import random
 import time
-from urllib.parse import urlparse
 
+import urllib3.util
 from ratelimit import sleep_and_retry, limits
 from requests import Timeout, RequestException
 from requests.exceptions import HTTPError
@@ -97,7 +97,7 @@ class GitHubAPI:
     @staticmethod
     def extract_owner_repo(github_url: str):
         """Extract owner and repo from a GitHub URL."""
-        parsed_url = urlparse(github_url)
+        parsed_url = urllib3.util.parse_url(github_url)
         path_parts = parsed_url.path.strip("/").split("/")
 
         if len(path_parts) >= 2:
