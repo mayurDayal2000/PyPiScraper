@@ -12,6 +12,7 @@ from requests.exceptions import HTTPError
 from requests_cache import CachedSession
 
 from app.database import SupabaseDatabase
+from app.github_api import GitHubAPI
 from app.model import Project
 from utils.helpers import get_headers
 
@@ -50,6 +51,9 @@ class PyPiScrapper:
 
         # initialize the database client
         self.db = SupabaseDatabase()
+
+        # initialize GitHub API client
+        self.github_api = GitHubAPI(cache_expiry=cache_expiry)
 
         # load progress
         self.load_progress()
@@ -164,12 +168,51 @@ class PyPiScrapper:
                     project_github_repo = href
                     break
 
+        repo_name = None
+        repo_description = None
+        repo_html_url = None
+        repo_stargazers_count = 0
+        repo_forks_count = 0
+        repo_open_issues_count = 0
+        repo_language = None
+        repo_updated_at = None
+        repo_created_at = None
+        repo_watchers_count = 0
+
+        if project_github_repo:
+            repo_data = self.github_api.get_repo_details(project_github_repo)
+            if repo_data:
+                repo_name = repo_data.get("name")
+                repo_description = repo_data.get("description")
+                repo_html_url = repo_data.get("html_url")
+                repo_stargazers_count = repo_data.get("stargazers_count", 0)
+                repo_forks_count = repo_data.get("forks_count", 0)
+                repo_open_issues_count = repo_data.get("open_issues_count", 0)
+                repo_language = repo_data.get("language")
+                repo_updated_at = repo_data.get("updated_at")
+                repo_created_at = repo_data.get("created_at")
+                repo_watchers_count = repo_data.get("watchers_count", 0)
+            else:
+                self.logger.warning(
+                    f"Failed to get GitHub details for {project_github_repo}"
+                )
+
         project = Project(
             project_title=project_title,
             project_description=project_description,
             project_maintainer=project_maintainer,
             project_maintainer_email=project_maintainer_email,
             project_github_repo=project_github_repo,
+            repo_name=repo_name,
+            repo_description=repo_description,
+            repo_html_url=repo_html_url,
+            repo_stargazers_count=repo_stargazers_count,
+            repo_forks_count=repo_forks_count,
+            repo_open_issues_count=repo_open_issues_count,
+            repo_language=repo_language,
+            repo_updated_at=repo_updated_at,
+            repo_created_at=repo_created_at,
+            repo_watchers_count=repo_watchers_count,
         )
 
         self.logger.info(f"Scraped project: {project.project_title}")
