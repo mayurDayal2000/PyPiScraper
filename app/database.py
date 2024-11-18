@@ -41,7 +41,7 @@ class SupabaseDatabase:
 
         try:
             res = self.supabase.table("projects").insert(data).execute()
-            if res.error:
+            if not res.data:
                 self.logger.error(f"Error inserting project: {res.error}")
                 return None
             self.logger.info(f"Successfully inserted project: {project.project_title}")
@@ -53,7 +53,7 @@ class SupabaseDatabase:
     def get_projects(self):
         try:
             res = self.supabase.table("projects").select("*").execute()
-            if res.error:
+            if not res.data:
                 self.logger.error(f"Error fetching projects: {res.error}")
                 return []
             return res.data

@@ -239,17 +239,7 @@ class PyPiScrapper:
                 project_data = self.scrape_project_page(project)
 
                 if project_data:
-                    res = self.db.insert_project(project_data)
-
-                    if res.error:
-                        self.logger.error(
-                            f"Failed to insert project {project_data.project_title}: {res.error}."
-                        )
-                    else:
-                        self.logger.info(
-                            f"Inserted project {project_data.project_title} into database."
-                        )
-
+                    self.db.insert_project(project_data)
                     self.visited_projects.add(project)
                 else:
                     self.logger.warning(
