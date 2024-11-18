@@ -1,3 +1,14 @@
 .venv
-.env
 .idea
+
+.git
+__pycache__/
+*.py[cod]
+*$py.class
+
+.env
+.env.*
+.DS_Store
+
+progress.json
+*.log
