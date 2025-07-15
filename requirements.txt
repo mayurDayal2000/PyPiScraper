@@ -1,4 +1,4 @@
-aiohttp==3.11.2
+aiohttp==3.12.14
 beautifulsoup4==4.13.0b2
 fastapi==0.115.4
 fake-useragent==1.5.1
